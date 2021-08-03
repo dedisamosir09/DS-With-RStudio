@@ -1,0 +1,420 @@
+---
+title: "Credit Risk Classification"
+author: "Dedi Irwanto Samosir"
+date: "05/01/2021"
+output: 
+  html_document: 
+    theme: journal
+---
+
+==================================================================
+
+# Description
+
+<p style="text-align: justify;">The purpose of this database is to provide information about a bank's customers so that machine learning models can be developed that can predict whether a particular customer will repay the loan or not. We investigated 4 algorithms: Logistic Regression, Decision Tree, Random Forest, and Support Vector Machine (SVM). </p>
+
+<p style="text-align: justify;">
+The dataset used in this report is Credit Risk data in Kaggle. The dataset can be downloaded here.
+Link to dataset: <https://www.kaggle.com/upadorprofzs/credit-risk>
+</p>
+
+#### Variable Name Description Type
+1. clientid = Client id Person  
+2. income = Income of the client 
+3. age = Age of client   
+4. loan = Load value 
+5. default = target 0 good client, 1 not.
+
+
+#### Report Outline
+1. Data Extraction  
+2. Exploratory Data Analysis  
+3. Data Preparation  
+4. Modeling  
+5. Evaluation  
+6. Recommendation  
+
+### 1. Data Extraction  
+<p style="text-align: justify;">
+The dataset is downloaded from Kaggle and saved in the data folder. We use **read.csv()** function to read the dataset and put in **CustomerCredit_df** data frame.
+</p>
+
+
+
+```{r}
+CustomerCredit_df<-read.csv("C:/Users/dedis/Documents/Data Science Course/Portofolio/data/credit_risk.csv")
+```
+
+See the data dimension. The dataset has 2000 rows and 5 columns.
+```{r}
+dim(CustomerCredit_df)
+```
+
+### 2. Exploratory Data Analysis  
+To find out the column names and types, we used **str()** function.
+```{r}
+str(CustomerCredit_df)
+```
+<p style="text-align: justify;">
+**From the result above, we know the following:**  
+1. The first column is **id**. It is unique and unnecessary for prediction. So, it should be removed.  
+2. The fifth column is **default** Currently the type is **int** and it should be converted to **factor** and change variable name to be **payment_status** 
+</p>
+```{r}
+# remove unnecessary columns
+CustomerCredit_df$clientid <- NULL
+
+# change to factor for target variable 
+colnames(CustomerCredit_df)[4] <- "payment_status"  
+CustomerCredit_df$payment_status <- factor(CustomerCredit_df$payment_status,
+                                           levels = c(0,1),
+                                           labels = c("Paid", "Unpaid"))
+```
+#### 2.1. Univariate Data Analysis
+Analysis of a single variable.   
+Number of paid (P) and unpaid (UP) in **payment_status** column.
+
+<p style="text-align: justify;">
+```{r, warning=FALSE}
+library(ggplot2)
+ggplot(data=CustomerCredit_df, aes(x=payment_status)) + geom_bar(color="white",fill = "#49B3E8")+ 
+    geom_text(aes(y = ..count.. -50,label = paste0(round(prop.table(..count..),4) * 100, '%')), 
+              stat = 'count', position = position_stack(vjust=0.5), size = 5,color= "white") +
+    labs(title="Payment Status Of Client", x="Payment Status") 
+
+```
+<p style="text-align: justify;">
+From the result above, we know that the number of customer **Paid** is more than **Unpaid**. 
+</p>
+
+Distribution of **loan** variable in Bar
+```{r, warning=FALSE}
+ggplot(data=CustomerCredit_df, aes(x=loan))+
+    geom_histogram(color="white",fill = "#49B3E8")+
+    scale_x_continuous(breaks = c(0,2000,4000,6000,8000,10000,12000,14000),
+                       labels = c("0","2000","4000","6000","8000","10000","12000",
+                                  "14000"),
+                       limits = c(1000,14000))+
+    labs(title = "Loan Of Client",
+         x="Loan", y="Count")
+```
+<p style="text-align: justify;">
+From the result above, we know that data distribution of **client loan** is uneven, it's leaning more to the left
+</p>
+
+Distribution of **age** variable in Bar
+```{r, warning=FALSE, message=FALSE}
+ggplot(data=CustomerCredit_df, aes(x=age))+
+    geom_histogram(color="white",fill = "#49B3E8")+
+    labs(title = "Age Of Client",
+         x="Age", y="Count")
+```
+
+Distribution of **income** variable in Bar
+```{r, warning=FALSE, message=FALSE}
+ggplot(data=CustomerCredit_df, aes(x=income))+
+    geom_histogram(color="white",fill = "#49B3E8")+
+    scale_x_continuous(breaks = c(20000,30000,40000,50000
+                                  ,60000,70000),
+                       labels = c("20000","30000",
+                                  "40000","50000","60000"
+                                  ,"70000"),
+                       limits = c(20000,70000))+
+    labs(title = "Income Of Client",
+         x="Income", y="Count")
+```
+
+<p style="text-align: justify;">
+From the result above, we know that data distribution of **Income Client**is normal 
+</p>
+
+#### 2.2. Bivariate Data Analysis  
+Analysis of two variables.  
+Distribution of **loan** variable based on **payment_status**.  
+
+```{r, warning=FALSE}
+ggplot(data=CustomerCredit_df, aes(x=payment_status, 
+                                        y=loan,
+                                        color = payment_status)) + 
+    scale_y_continuous(breaks = c(0,2000,4000,6000,8000,10000,12000,14000),
+                       labels = c("0","2000","4000","6000","8000","10000","12000",
+                                  "14000"),
+                       limits = c(1000,14000))+
+    geom_boxplot(alpha=.3) + 
+
+    geom_jitter(alpha = 0.3,
+                color = "blue", 
+                width = 0.2) + 
+    labs(title="Payment Status based on Loan", 
+         x="Payment Status", y="Loan")
+```
+<p style="text-align: justify;">
+**From the result above, we know the following:**   
+1. Based on Loan , the number of paid is above 2000 and below 7000  
+2. Based on Loan , the number of unpaid is is above 5000 and below 10000   
+</p>
+
+Distribution of **income** variable based on **payment_status**.  
+```{r}
+ggplot(data=CustomerCredit_df, aes(x=payment_status, 
+                                        y=income,
+                                        color = payment_status)) + 
+    scale_y_continuous(breaks = c(20000,30000,40000,50000
+                                  ,60000,70000),
+                       labels = c("20000","30000",
+                                  "40000","50000","60000"
+                                  ,"70000"),
+                       limits = c(20000,70000))+
+    geom_boxplot(alpha=.3) + 
+    geom_jitter(alpha = 0.3,
+                color = "blue", 
+                width = 0.2) + 
+    labs(title="Payment Status based on Income", 
+         x="Payment Status", y="Income")
+
+```
+<p style="text-align: justify;">
+**From the result above, we know the following:**  
+Based on Income of Customer, we see that customer who have a high salary or low salary has a potency to pay or unpaid their loan   
+</p>
+
+Distribution of **age** variable based on **payment_status**.
+```{r}
+ggplot(data=CustomerCredit_df, aes(x=age, 
+                                        fill=payment_status)) +
+    geom_density(alpha=.3)+
+    labs(title="Payment Status based on Age", 
+         x="Age")
+```  
+
+#### 2.3. Multivariate Data Analysis
+Compute and visualize correlation coefficient of each measurement.
+
+Visualize Pearson’s Correlation Coefficient variables.
+```{r}
+library(corrgram)
+corrgram(CustomerCredit_df[,c("income", "loan", "age")],
+         main="Pearson’s Correlation Coefficient variables")
+```  
+<p style="text-align: justify;">
+**From the result above, we know the following:**   
+variable **income** has a strong corelation with variable **loan** than variable **age** 
+</p>
+
+### 3. Data Preparation  
+#### 3.1 Feature Selection
+```{r}
+# remove unnecessary columns
+# CustomerCredit_df$clientid <- NULL
+```
+
+#### 3.2 Remove Outlier
+##### 3.2.1 Get Outliers Values
+In this section, it is a part of getting the outliers value.
+
+**Get Outliers Values**
+```{r}
+out_age <- boxplot.stats(CustomerCredit_df$age)$out
+out_age
+```
+**Get Outliers Index**
+```{r}
+out_idx <- which(CustomerCredit_df$age %in% c(out_age))
+out_idx
+```
+**Data Without Outliers**
+```{r}
+CustomerCredit_clean <-CustomerCredit_df[-out_idx,]
+dim(CustomerCredit_clean)
+```
+##### 3.2.2 Handling Missing Value  
+**Detect Missing Value on Data**  
+
+Distribution of Missing Value in Pattern
+```{r, warning=FALSE, message=FALSE}
+library(mice)
+md.pattern(CustomerCredit_clean)
+```
+
+  
+**Imputation  Missing Value With Mean**  
+```{r,warning=FALSE, message=FALSE}
+CustomerCredit_df.imput = CustomerCredit_clean
+for(i in which(sapply(CustomerCredit_df.imput, is.numeric))){
+    CustomerCredit_df.imput[is.na(CustomerCredit_df.imput[, i]), i] <- mean(CustomerCredit_df.imput[, i], na.rm = TRUE)
+}
+```
+#### 3.3 Training and Test Division  
+```{r,warning=FALSE, message=FALSE}
+set.seed(2021)
+m = nrow(CustomerCredit_df.imput)
+train_ind <- sample(m, 0.8 * m)
+TrainingSet <- CustomerCredit_df.imput[train_ind, ]
+TestingSet <- CustomerCredit_df.imput[-train_ind, ]
+```
+
+### 4. Modelling  
+#### 4.1 Logistic Regression  
+```{r, warning=FALSE, message=FALSE}
+library(caret)
+Model_LG <- train(payment_status ~ ., data = TrainingSet,
+               method = "glm",
+               na.action = na.omit,
+               preProcess=c("scale","center"),
+               trControl= trainControl(method="none")
+)
+summary(Model_LG)  
+
+# Feature importance
+print(varImp(Model_LG))
+Importance <- varImp(Model_LG)
+plot(Importance, col = "red")
+
+```
+
+#### 4.2 Classification Tree  
+```{r,warning=FALSE, message=FALSE}
+library(party)
+Model_CT <- train(payment_status ~ ., data = TrainingSet,
+               method = "LMT",
+               na.action = na.omit,
+               preProcess=c("scale","center"),
+               trControl= trainControl(method="none")
+)
+summary(Model_CT) 
+```
+```{r}
+# Feature importance
+print(varImp(Model_CT))
+Importance <- varImp(Model_CT)
+plot(Importance, col = "red")
+```
+
+#### 4.3 Random Forest
+```{r,warning=FALSE, message=FALSE}
+library(randomForest)
+set.seed(2021)
+fit.forest <- randomForest(formula = payment_status ~ .,
+                           data = TrainingSet,
+                           na.action = na.roughfix)
+fit.forest
+summary(fit.forest)  
+# Feature importance
+varImpPlot(fit.forest)
+
+```
+
+#### 4.4 Support Vector Machine
+```{r,warning=FALSE, message=FALSE}
+library(e1071)
+library(caret )
+
+
+Model_SVM <-   train(payment_status ~ ., data = TrainingSet,
+               method = "svmPoly",
+               na.action = na.omit,
+               preProcess=c("scale","center"),
+               trControl= trainControl(method="none"),
+               tuneGrid = data.frame(degree=1,scale=1,C=1)
+)
+
+summary(Model_SVM)
+
+# Feature importance
+print(varImp(Model_SVM))
+Importance <- varImp(Model_SVM)
+plot(Importance, col = "red")
+```
+
+
+### 5. Evaluate The Model 
+#### 5.1 Logistic Regression
+```{r}
+Model.Testing.LG <- predict(Model_LG, TestingSet)
+Model.testing.confusion.LG <-confusionMatrix(Model.Testing.LG,                                         TestingSet$payment_status,
+                                             dnn = c("Predict","Actual"))
+Model.testing.confusion.LG
+
+```
+```{r}
+ggplot(data=TestingSet, aes(x=payment_status, 
+                                   y=Model.Testing.LG)) + 
+    
+    geom_boxplot(alpha=.3) + 
+    
+    geom_jitter(alpha = 0.3,
+                color = "blue", 
+                width = 0.2) + 
+    labs(title="Actual VS Predicted", 
+         x="Actual", y="Predicted")
+```
+#### 5.2 Support Vector Machine
+```{r}
+Model.Testing.SV <- predict(Model_SVM, TestingSet)
+Model.testing.confusion <-confusionMatrix(Model.Testing.SV,
+                                   TestingSet$payment_status)
+Model.testing.confusion
+```
+```{r}
+ggplot(data=TestingSet, aes(x=payment_status, 
+                            y=Model.Testing.SV)) + 
+    
+    geom_boxplot(alpha=.3) + 
+    
+    geom_jitter(alpha = 0.3,
+                color = "blue", 
+                width = 0.2) + 
+    labs(title="Actual VS Predicted", 
+         x="Actual", y="Predicted")
+```
+
+#### 5.3 Random Forest
+```{r}
+Model.Testing.RF <- predict(fit.forest, TestingSet)
+Model.testing.confusion <-confusionMatrix(Model.Testing.RF,
+                                          TestingSet$payment_status)
+Model.testing.confusion
+
+```
+
+```{r}
+ggplot(data=TestingSet, aes(x=payment_status, 
+                            y=Model.Testing.RF)) + 
+    
+    geom_boxplot(alpha=.3) + 
+    
+    geom_jitter(alpha = 0.3,
+                color = "blue", 
+                width = 0.2) + 
+    labs(title="Actual VS Predicted", 
+         x="Actual", y="Predicted")
+```
+
+#### 5.4 Classification Tree
+```{r}
+Model.Testing.CT <- predict(Model_CT, TestingSet)
+Model.testing.confusion <-confusionMatrix(Model.Testing.CT,
+                                          TestingSet$payment_status)
+Model.testing.confusion
+```
+
+```{r}
+ggplot(data=TestingSet, aes(x=payment_status, 
+                            y=Model.Testing.CT)) + 
+    
+    geom_boxplot(alpha=.3) + 
+    
+    geom_jitter(alpha = 0.3,
+                color = "blue", 
+                width = 0.2) + 
+    labs(title="Actual VS Predicted", 
+         x="Actual", y="Predicted")
+```
+
+### 6. Reccomendation  
+<p style="text-align: justify;">
+**From the result above, we know the following:**   
+1. Classification Tree is the best among all the tested algortihms  
+2. Based Classification Tree Model , the most important variables are age, loan and income  
+3. For age around 25 to 30 the value of the loan may be lowered The results can be improved by better data preparation  
+</p>
